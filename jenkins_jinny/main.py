@@ -36,8 +36,8 @@ class Build:
                  build_number=None,
                  server=None):
         """
-        :param url: Url of job completely. It will be parsed into server,
-        job_name, build_number. Has highest priority than next parameters
+        :param url: full url address of job. It will be parsed into server,
+        job_name, build_number
 
         :param job_name: name of job (without jenkins url anf view's name)
 
@@ -46,14 +46,6 @@ class Build:
 
         :param server: str with url of Jenkins server or jenkins.Jenkins object
         """
-        # print(f"Creating Build {url=} {job_name=} {build_number=}")
-        self.name = job_name
-        self._number = int(
-            build_number) if build_number is not None else 'lastBuild'
-        if isinstance(server, str):
-            server = jenkins.Jenkins(server)
-        self.server = server
-        # jenkins.Jenkins(SERVER_URL).jenkins_request()
         self._parent = None
         self._children = list()
         if url:
@@ -61,19 +53,31 @@ class Build:
             _url = url.strip("/")
             parsed = parse("{server}/job/{job_name}/{build_number}", _url)
             if parsed:
-                self._number = int(parsed['build_number'])
+                self.number = int(parsed['build_number'])
                 self.server = jenkins.Jenkins(parsed['server'])
                 self.name = parsed['job_name']
             else:
                 parsed = parse("{server}/job/{job_name}", _url)
                 self.server = jenkins.Jenkins(parsed['server'])
                 self.name = parsed['job_name']
-                self._number = int(
+                self.number = int(
                     self.server.get_job_info(parsed['job_name'])[
                         'lastCompletedBuild']['number']
                 )
-                self.url = f"{_url}/{self._number}"
+                self.url = f"{_url}/{self.number}"
         else:
+            self.name = job_name
+
+            if isinstance(server, str):
+                server = jenkins.Jenkins(server)
+            self.server = server
+
+            if build_number is None:
+                self.number = self.server.get_job_info(job_name)[
+                    'lastCompletedBuild']['number']
+            else:
+                self.number = int(build_number)
+
             self.url = f"{self.server.server}/job/{self.name}/{self.number}"
 
     def __repr__(self):
@@ -90,14 +94,6 @@ class Build:
                                   display_name=self.display_name,
                                   param=self.param
                                   )
-
-    @property
-    def number(self):
-
-        if self._number == 'lastBuild':
-            self._number = int(self.get_build_info()['lastCompletedBuild']['number'])
-        return self._number
-
 
     @property
     def param(self):
