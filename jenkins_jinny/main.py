@@ -48,7 +48,7 @@ class Build:
         """
         # print(f"Creating Build {url=} {job_name=} {build_number=}")
         self.name = job_name
-        self.number = int(
+        self._number = int(
             build_number) if build_number is not None else 'lastBuild'
         if isinstance(server, str):
             server = jenkins.Jenkins(server)
@@ -61,16 +61,18 @@ class Build:
             _url = url.strip("/")
             parsed = parse("{server}/job/{job_name}/{build_number}", _url)
             if parsed:
-                self.number = int(parsed['build_number'])
+                self._number = int(parsed['build_number'])
                 self.server = jenkins.Jenkins(parsed['server'])
                 self.name = parsed['job_name']
             else:
                 parsed = parse("{server}/job/{job_name}", _url)
                 self.server = jenkins.Jenkins(parsed['server'])
                 self.name = parsed['job_name']
-                self.number = self.server.get_job_info(parsed['job_name'])[
-                    'lastCompletedBuild']['number']
-                self.url = f"{_url}/{self.number}"
+                self._number = int(
+                    self.server.get_job_info(parsed['job_name'])[
+                        'lastCompletedBuild']['number']
+                )
+                self.url = f"{_url}/{self._number}"
         else:
             self.url = f"{self.server.server}/job/{self.name}/{self.number}"
 
@@ -88,6 +90,14 @@ class Build:
                                   display_name=self.display_name,
                                   param=self.param
                                   )
+
+    @property
+    def number(self):
+
+        if self._number == 'lastBuild':
+            self._number = int(self.get_build_info()['lastCompletedBuild']['number'])
+        return self._number
+
 
     @property
     def param(self):
