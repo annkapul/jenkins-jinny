@@ -28,6 +28,7 @@ class Params:
     def __repr__(self):
         return " ".join(f"{k}={v}" for k, v in self.__dict__.items())
 
+
 class Build:
     def __init__(self,
                  url=None,
@@ -35,13 +36,22 @@ class Build:
                  build_number=None,
                  server=None):
         """
-        :param url:
-        :param job_name:
-        :param build_number:
+        :param url: Url of job completely. It will be parsed into server,
+        job_name, build_number. Has highest priority than next parameters
+
+        :param job_name: name of job (without jenkins url anf view's name)
+
+        :param build_number: int , number of the build. Returns latest build
+        if not defined
+
+        :param server: str with url of Jenkins server or jenkins.Jenkins object
         """
         # print(f"Creating Build {url=} {job_name=} {build_number=}")
         self.name = job_name
-        self.number = int(build_number) if build_number is not None else 'lastBuild'
+        self.number = int(
+            build_number) if build_number is not None else 'lastBuild'
+        if isinstance(server, str):
+            server = jenkins.Jenkins(server)
         self.server = server
         # jenkins.Jenkins(SERVER_URL).jenkins_request()
         self._parent = None
@@ -58,7 +68,7 @@ class Build:
                 parsed = parse("{server}/job/{job_name}", _url)
                 self.server = jenkins.Jenkins(parsed['server'])
                 self.name = parsed['job_name']
-                self.number =  self.server.get_job_info(parsed['job_name'])[
+                self.number = self.server.get_job_info(parsed['job_name'])[
                     'lastCompletedBuild']['number']
                 self.url = f"{_url}/{self.number}"
         else:
@@ -115,7 +125,7 @@ class Build:
         parent_job = Build(job_name=found[0]["upstreamProject"],
                            build_number=found[0]["upstreamBuild"],
                            server=self.server
-        )
+                           )
         self._parent = parent_job
         return parent_job
 
@@ -173,13 +183,14 @@ class Build:
         resp = requests.Request(method='GET', url=self.url + "/wfapi/describe")
         return resp.json().get('stages')
 
-    def rebuild(self, params: dict=None):
+    def rebuild(self, params: dict = None):
         raise NotImplementedError
         # TODO: complete this
         if not params:
             return
         for param, value in params:
             pass
+
 
 def diff_job_params(urls, diff_only=False, to_html=False, fmt=None):
     if fmt:
@@ -191,7 +202,7 @@ def diff_job_params(urls, diff_only=False, to_html=False, fmt=None):
     all_keys = sorted(
         set(sum(
             [list(build_params.keys()) for build_params in params], []
-            )))
+        )))
 
     for build_params in params:
         for key in all_keys:
@@ -208,7 +219,7 @@ def diff_job_params(urls, diff_only=False, to_html=False, fmt=None):
         dd = table.ne(table[headers[0]], axis='index')
         da = dd[dd == True]
         da = da.any(axis='columns')
-        row_to_drop = da [da == False]
+        row_to_drop = da[da == False]
 
         table = table.drop(row_to_drop.index)
 
@@ -237,13 +248,14 @@ def children(build):
         yield from children(child)
 
 
-def find_root(build:Build):
+def find_root(build: Build):
     for node in parents(build):
         if node is None: return build
         # print(f"{node=} in parents of {build=}")
         if node.parent is None:
             print(f"Found root {node=}")
             return node
+
 
 def build_flow(url, fmt):
     if fmt:
@@ -264,7 +276,7 @@ def build_flow(url, fmt):
         build = Build(job_name=job_name,
                       build_number=build_number,
                       server=_jenkins)
-        print(f"{'  '*depth} {build}")
+        print(f"{'  ' * depth} {build}")
 
     # ipdb.set_trace()
     # nx.write_latex(G, "just_my_figure.tex")
@@ -319,7 +331,8 @@ def search_build(url, condition, limit, fmt):
                 found = False
 
         if found:
-            print(f"{build.__repr__():40} {build.duration:>12} {build.status:12} {build.url}")
+            print(
+                f"{build.__repr__():40} {build.duration:>12} {build.status:12} {build.url}")
 
         previous = jmespath.search("previousBuild.url", build.get_build_info())
         if previous is None:
@@ -358,7 +371,6 @@ def jobs_in_view(view_url, fmt):
     server_url = parsed_view_url["server"]
     view_name = parsed_view_url["name"]
     _server = jenkins.Jenkins(server_url)
-
 
     jobs = _server.get_jobs(view_name=view_name)
     for job in jobs:
