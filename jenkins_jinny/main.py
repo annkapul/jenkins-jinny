@@ -181,7 +181,7 @@ class Build:
     def duration(self):
         delta = datetime.timedelta(
             seconds=self.get_build_info().get('duration') // 1000)
-        return str(delta)
+        return delta
 
     def _get_stages(self):
         raise NotImplementedError
