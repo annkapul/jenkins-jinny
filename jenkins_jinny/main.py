@@ -10,6 +10,7 @@ import ipdb
 import pathlib
 import datetime
 import operator
+from typing import List
 
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
@@ -338,7 +339,7 @@ def search_build(url, condition, limit, fmt):
 
         if found:
             print(
-                f"{build.__repr__():40} {build.duration:>12} {build.status:12} {build.url}")
+                f"{build.__repr__():40} {build.duration} {build.status:12} {build.url}")
 
         previous = jmespath.search("previousBuild.url", build.get_build_info())
         if previous is None:
@@ -369,7 +370,10 @@ def show_param(url, params, limit, fmt):
         build = Build(url=previous)
 
 
-def jobs_in_view(view_url, fmt):
+def jobs_in_view(view_url: str, fmt: str) -> List[Build]:
+    """
+    Returns list of job (in Build type)
+    """
     if fmt:
         globals()['fmt'] = fmt
     view_url = view_url.strip("/")
@@ -382,5 +386,7 @@ def jobs_in_view(view_url, fmt):
     for job in jobs:
         try:
             print(f"{Build(url=job['url'])}")
+            yield Build(url=job['url'])
         except TypeError as e:
-            pass
+            print(f"Occured error {e}")
+
