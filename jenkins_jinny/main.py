@@ -1,3 +1,5 @@
+import enum
+
 import numpy as np
 
 import jenkins
@@ -11,6 +13,7 @@ import pathlib
 import datetime
 import operator
 from typing import List
+from .exceptions import BuildNotFoundException
 
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
@@ -29,13 +32,23 @@ class Params:
     def __repr__(self):
         return " ".join(f"{k}={v}" for k, v in self.__dict__.items())
 
+class LastBuildLinks(str, enum.Enum):
+    LAST_BUILD = 'lastBuild'
+    LAST_COMPLETED = "lastCompletedBuild"
+    LAST_FAILED = "lastFailedBuild"
+    LAST_SUCCESSFUL = "lastSuccessfulBuild"
+    LAST_UNSUCCESSFUL = "lastUnsuccessfulBuild"
+
+
+
 
 class Build:
     def __init__(self,
                  url=None,
                  job_name=None,
                  build_number=None,
-                 server=None):
+                 server=None,
+                 last_build_link=LastBuildLinks.LAST_BUILD):
         """
         :param url: full url address of job. It will be parsed into server,
         job_name, build_number
@@ -48,34 +61,37 @@ class Build:
         :param server: str with url of Jenkins server or jenkins.Jenkins object
         """
         self._parent = None
+        self._heirs = None
         self._children = list()
+        server_params = {}
         if url:
             self.url = url
             _url = url.strip("/")
             parsed = parse("{server}/job/{job_name}/{build_number}", _url)
             if parsed:
                 self.number = int(parsed['build_number'])
-                self.server = jenkins.Jenkins(parsed['server'])
+                self.server = jenkins.Jenkins(parsed['server'], **server_params)
                 self.name = parsed['job_name']
             else:
                 parsed = parse("{server}/job/{job_name}", _url)
-                self.server = jenkins.Jenkins(parsed['server'])
+                self.server = jenkins.Jenkins(parsed['server'], **server_params)
                 self.name = parsed['job_name']
-                self.number = int(
-                    self.server.get_job_info(parsed['job_name'])[
-                        'lastCompletedBuild']['number']
-                )
+                info = self.server.get_job_info(parsed['job_name'])
+                if info.get(last_build_link):
+                    self.number = int(info[last_build_link]['number'])
+                else:
+                    self.number = ""
                 self.url = f"{_url}/{self.number}"
         else:
             self.name = job_name
 
             if isinstance(server, str):
-                server = jenkins.Jenkins(server)
+                server = jenkins.Jenkins(server, **server_params)
             self.server = server
 
             if build_number is None:
                 self.number = self.server.get_job_info(job_name)[
-                    'lastCompletedBuild']['number']
+                    last_build_link]['number']
             else:
                 self.number = int(build_number)
 
@@ -156,11 +172,31 @@ class Build:
         self._children = result
         return result
 
+    @property
+    def heirs(self):
+        if self._heirs: return self._heirs
+        self._heirs = children(self)
+        return self._heirs
+
+    def get_child_job(self, name_pattern):
+        return [ch
+                for ch in self.heirs
+                if name_pattern in ch.name]
+
     def get_build_info(self):
         return self.server.get_build_info(self.name, self.number)
 
+    def build(self):
+        raise NotImplemented
+        return self.server.build_job(self.name, token="")
+
+    def is_in_queue(self):
+        return self.name in [j["task"]["name"] for j in self.server.get_queue_info()]
+
     @property
     def status(self):
+        if self.is_in_queue():
+            return "IN_QUEUE"
         if self.get_build_info().get('building'):
             return "BUILDING"
         return self.get_build_info().get('result')
@@ -168,6 +204,14 @@ class Build:
     @property
     def display_name(self):
         return self.get_build_info().get('displayName')
+
+    @property
+    def description(self):
+        return self.get_build_info()["description"]
+
+    @property
+    def triggered_by(self):
+        return
 
     @property
     def start_time(self):
@@ -184,19 +228,33 @@ class Build:
             seconds=self.get_build_info().get('duration') // 1000)
         return delta
 
-    def _get_stages(self):
-        raise NotImplementedError
-        # TODO: complete this
-        resp = requests.Request(method='GET', url=self.url + "/wfapi/describe")
-        return resp.json().get('stages')
+    # def _get_stages(self):
+    #     raise NotImplementedError
+    #     # TODO: complete this
+    #     resp = requests.Request(method='GET', url=self.url + "/wfapi/describe")
+    #     return resp.json().get('stages')
 
-    def rebuild(self, params: dict = None):
-        raise NotImplementedError
-        # TODO: complete this
-        if not params:
-            return
-        for param, value in params:
-            pass
+    # def rebuild(self, params: dict = None):
+    #     raise NotImplementedError
+    #     # TODO: complete this
+    #     if not params:
+    #         return
+    #     for param, value in params:
+    #         pass
+
+    def get_logs(self, read_from_end=False):
+        logs = self.server.get_build_console_output(self.name, self.number)
+        direction_read = slice(None, None, -1) \
+            if read_from_end \
+            else slice(None, None, 1)
+        for line in logs.split("\n")[direction_read]:
+            yield line
+
+    def get_artifacts_content(self, filename_pattern):
+        return self.server.get_build_artifact_as_bytes(self.name, self.number, filename_pattern)
+
+    def get_link_from_description(self):
+        self.get_build_info()
 
 
 def diff_job_params(urls, diff_only=False, to_html=False, fmt=None):
@@ -385,8 +443,9 @@ def jobs_in_view(view_url: str, fmt: str) -> List[Build]:
     jobs = _server.get_jobs(view_name=view_name)
     for job in jobs:
         try:
-            print(f"{Build(url=job['url'])}")
+            print(job['url'])
+            print(Build(url=job['url']))
             yield Build(url=job['url'])
         except TypeError as e:
-            print(f"Occured error {e}")
-
+            print(f"Occurred error {e}")
+            raise f"Occurred error {e}"

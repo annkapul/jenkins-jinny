@@ -120,7 +120,9 @@ def show_param(url, params, limit, with_pdb, fmt):
 @click.option("--pdb", "with_pdb", is_flag=True, default=False, help=PDB_HELP)
 def jobs_in_view(view_url, fmt, with_pdb):
     with pdb_context(with_pdb):
-        main.jobs_in_view(view_url, fmt)
+        for j in main.jobs_in_view(view_url, fmt):
+            print(j)
+
 
 
 def start():
