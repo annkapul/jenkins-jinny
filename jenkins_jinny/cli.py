@@ -121,7 +121,7 @@ def show_param(url, params, limit, with_pdb, fmt):
 def jobs_in_view(view_url, fmt, with_pdb):
     with pdb_context(with_pdb):
         for j in main.jobs_in_view(view_url, fmt):
-            print(j)
+            print("{}".format(j))
 
 
 

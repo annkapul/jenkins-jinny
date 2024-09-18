@@ -1,7 +1,6 @@
 import enum
 
 import numpy as np
-
 import jenkins
 import jmespath
 import pandas as pd
@@ -14,6 +13,8 @@ import datetime
 import operator
 from typing import List
 from .exceptions import BuildNotFoundException
+import jenkins_jinny.config as config
+
 
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
@@ -27,10 +28,11 @@ class Params:
     def __getattr__(self, name):
         # Do not throw Attribute error if object doesn't have an attribute
         # with 'name'
-        return "noitem"
+        return None
 
     def __repr__(self):
         return " ".join(f"{k}={v}" for k, v in self.__dict__.items())
+
 
 class LastBuildLinks(str, enum.Enum):
     LAST_BUILD = 'lastBuild'
@@ -38,8 +40,6 @@ class LastBuildLinks(str, enum.Enum):
     LAST_FAILED = "lastFailedBuild"
     LAST_SUCCESSFUL = "lastSuccessfulBuild"
     LAST_UNSUCCESSFUL = "lastUnsuccessfulBuild"
-
-
 
 
 class Build:
@@ -63,7 +63,10 @@ class Build:
         self._parent = None
         self._heirs = None
         self._children = list()
-        server_params = {}
+        server_params = {
+            "username": config.JENKINS_USER,
+            "password": config.JENKINS_PASSWORD
+        }
         if url:
             self.url = url
             _url = url.strip("/")
@@ -114,12 +117,16 @@ class Build:
 
     @property
     def param(self):
+        if not self.is_exist():
+            return dict()
         return Params(**self.get_build_parameters())
 
-    def get_build_parameters(self):
+    def get_build_parameters(self) -> dict:
         build_info = self.server.get_build_info(self.name, self.number)
-        parameters = jmespath.search("actions[*].parameters", build_info)[0]
-        d = {param['name']: param['value'] for param in parameters}
+        parameters = jmespath.search("actions[*].parameters", build_info)
+        if not parameters:
+            return dict()
+        d = {param['name']: param['value'] for param in parameters[0]}
         return d
 
     @property
@@ -193,8 +200,22 @@ class Build:
     def is_in_queue(self):
         return self.name in [j["task"]["name"] for j in self.server.get_queue_info()]
 
+    def is_exist(self):
+        if not self.number:
+            return False
+        try:
+            self.server.get_build_info(self.name, self.number)
+        except jenkins.JenkinsException:
+            return False
+        except BaseException:
+            return False
+
+        return True
+
     @property
     def status(self):
+        if not self.is_exist():
+            return "NOT_EXIST"
         if self.is_in_queue():
             return "IN_QUEUE"
         if self.get_build_info().get('building'):
@@ -225,7 +246,7 @@ class Build:
     @property
     def duration(self):
         delta = datetime.timedelta(
-            seconds=self.get_build_info().get('duration') // 1000)
+            seconds=self.get_build_info().get('duration', 0) // 1000)
         return delta
 
     # def _get_stages(self):
@@ -255,6 +276,12 @@ class Build:
 
     def get_link_from_description(self):
         self.get_build_info()
+
+    def update_build_config(self, display_name):
+        self.server.submit_build(self.name, self.number,
+                                 {
+                                     "display_name": display_name
+                                 })
 
 
 def diff_job_params(urls, diff_only=False, to_html=False, fmt=None):
@@ -443,9 +470,9 @@ def jobs_in_view(view_url: str, fmt: str) -> List[Build]:
     jobs = _server.get_jobs(view_name=view_name)
     for job in jobs:
         try:
-            print(job['url'])
-            print(Build(url=job['url']))
+            # print(job['url'])
+            # print(f"{Build(url=job['url'])}")
             yield Build(url=job['url'])
         except TypeError as e:
             print(f"Occurred error {e}")
-            raise f"Occurred error {e}"
+            # raise f"Occurred error {e}"

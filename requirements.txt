@@ -5,6 +5,8 @@ matplotlib
 networkx
 numpy
 parse
-python-jenkins
 requests
 pandas
+# python-jenkins
+# python-jenkins @ file:///Users/harhipova/my_pet_projetcs/python-jenkins
+
