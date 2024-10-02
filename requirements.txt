@@ -7,6 +7,6 @@ numpy
 parse
 requests
 pandas
-# python-jenkins
+python-jenkins
 # python-jenkins @ file:///Users/harhipova/my_pet_projetcs/python-jenkins
 

@@ -12,6 +12,7 @@ import pathlib
 import datetime
 import operator
 from typing import List
+import functools
 from .exceptions import BuildNotFoundException
 import jenkins_jinny.config as config
 
@@ -121,6 +122,7 @@ class Build:
             return dict()
         return Params(**self.get_build_parameters())
 
+    @functools.lru_cache
     def get_build_parameters(self) -> dict:
         build_info = self.server.get_build_info(self.name, self.number)
         parameters = jmespath.search("actions[*].parameters", build_info)
