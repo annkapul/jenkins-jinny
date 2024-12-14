@@ -15,6 +15,7 @@ from typing import List
 import functools
 from .exceptions import BuildNotFoundException
 import jenkins_jinny.config as config
+import urllib.parse
 
 
 pd.set_option('display.max_rows', None)
@@ -200,7 +201,11 @@ class Build:
         return self.server.build_job(self.name, token="")
 
     def is_in_queue(self):
-        return self.name in [j["task"]["name"] for j in self.server.get_queue_info()]
+        try:
+            queue = self.server.get_queue_info()
+        except jenkins.NotFoundException as e:
+            return False
+        return self.name in [j["task"]["name"] for j in queue]
 
     def is_exist(self):
         if not self.number:
@@ -227,6 +232,28 @@ class Build:
     @property
     def display_name(self):
         return self.get_build_info().get('displayName')
+
+    @display_name.setter
+    def display_name(self, text):
+        data = {
+            "json": {
+                "Jenkins-Crumb": self.server.crumb.get("crumb"),
+                "displayName": f"#{self.number} {text}",
+                "description": f"{self.description}"
+                }
+            }
+        r = self.server.jenkins_request(
+            requests.Request(
+                'POST',
+                url=f"{self.url}/configSubmit",
+                data=urllib.parse.urlencode(data),
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Jenkins-Crumb": self.server.crumb.get("crumb")}
+                )
+            )
+        print(f"Updating displayName to {data['json']['displayName']} "
+              f"completed with code {r.status_code}")
 
     @property
     def description(self):
