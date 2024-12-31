@@ -62,6 +62,7 @@ class Build:
 
         :param server: str with url of Jenkins server or jenkins.Jenkins object
         """
+        self.__crumb = None
         self._parent = None
         self._heirs = None
         self._children = list()
@@ -131,6 +132,14 @@ class Build:
             return dict()
         d = {param['name']: param['value'] for param in parameters[0]}
         return d
+
+    @property
+    def _crumb(self):
+        if not self.__crumb:
+            self.server.get_nodes()
+            self.__crumb = self.server.crumb.get("crumb")
+        return self.__crumb
+
 
     @property
     def parent(self):
@@ -235,9 +244,12 @@ class Build:
 
     @display_name.setter
     def display_name(self, text):
+        """
+        Requires JENKINS_USER and JENKINS_PASSWORD
+        """
         data = {
             "json": {
-                "Jenkins-Crumb": self.server.crumb.get("crumb"),
+                "Jenkins-Crumb": self._crumb,
                 "displayName": f"#{self.number} {text}",
                 "description": f"{self.description}"
                 }
@@ -249,7 +261,7 @@ class Build:
                 data=urllib.parse.urlencode(data),
                 headers={
                     "Content-Type": "application/x-www-form-urlencoded",
-                    "Jenkins-Crumb": self.server.crumb.get("crumb")}
+                    "Jenkins-Crumb": self._crumb}
                 )
             )
         print(f"Updating displayName to {data['json']['displayName']} "
