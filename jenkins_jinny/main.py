@@ -11,7 +11,7 @@ import ipdb
 import pathlib
 import datetime
 import operator
-from typing import List
+from typing import List, Optional
 import functools
 from .exceptions import BuildNotFoundException
 import jenkins_jinny.config as config
@@ -45,12 +45,14 @@ class LastBuildLinks(str, enum.Enum):
 
 
 class Build:
+    _fmt: Optional[str]
     def __init__(self,
                  url=None,
                  job_name=None,
                  build_number=None,
                  server=None,
-                 last_build_link=LastBuildLinks.LAST_BUILD):
+                 last_build_link=LastBuildLinks.LAST_BUILD,
+                 fmt=None):
         """
         :param url: full url address of job. It will be parsed into server,
         job_name, build_number
@@ -66,6 +68,8 @@ class Build:
         self._parent = None
         self._heirs = None
         self._children = list()
+        if fmt:
+            Build.fmt(fmt)
         server_params = {
             "username": config.JENKINS_USER,
             "password": config.JENKINS_PASSWORD
@@ -103,11 +107,15 @@ class Build:
 
             self.url = f"{self.server.server}/job/{self.name}/{self.number}"
 
+    @classmethod
+    def fmt(cls, fmt):
+        cls._fmt = fmt
+
     def __repr__(self):
         return f"{self.name}#{self.number}"
 
     def __format__(self, format_spec=None):
-        format_spec = globals().get("fmt", None)
+        format_spec = Build._fmt
         if not format_spec:
             return str(self)
         return format_spec.format(**self.__dict__,
@@ -232,8 +240,6 @@ class Build:
     def status(self):
         if not self.is_exist():
             return "NOT_EXIST"
-        if self.is_in_queue():
-            return "IN_QUEUE"
         if self.get_build_info().get('building'):
             return "BUILDING"
         return self.get_build_info().get('result')
@@ -313,10 +319,11 @@ class Build:
             yield line
 
     def get_artifacts_content(self, filename_pattern):
+        print(self.get_build_info()["artifacts"])
         return self.server.get_build_artifact_as_bytes(self.name, self.number, filename_pattern)
 
     def get_link_from_description(self):
-        self.get_build_info()
+        return self.get_build_info()
 
     def update_build_config(self, display_name):
         self.server.submit_build(self.name, self.number,
@@ -326,9 +333,7 @@ class Build:
 
 
 def diff_job_params(urls, diff_only=False, to_html=False, fmt=None):
-    if fmt:
-        globals()['fmt'] = fmt
-    builds = [Build(url) for url in urls]
+    builds = [Build(url, fmt=fmt) for url in urls]
     data = dict()
 
     params = [build.get_build_parameters() for build in builds]
@@ -393,7 +398,7 @@ def find_root(build: Build):
 def build_flow(url, fmt):
     if fmt:
         globals()['fmt'] = fmt
-    build = Build(url=url)
+    build = Build(url=url, fmt=fmt)
     _jenkins = build.server
     G = nx.DiGraph()
     root_node = find_root(build)
@@ -421,7 +426,7 @@ def build_flow(url, fmt):
 
 
 def show_possible_upstreams(url, limit=10):
-    build = Build(url=url)
+    build = Build(url=url, fmt=fmt)
     for i in range(limit):
         print(f"{build} was triggered by {build.parent}")
         previous = jmespath.search("previousBuild.url", build.get_build_info())
@@ -429,15 +434,14 @@ def show_possible_upstreams(url, limit=10):
     return
 
 
-def debug_build(build):
-    b = Build(build)
+def debug_build(build, fmt):
+    b = Build(build, fmt=fmt)
+    print(f"{b}")
     ipdb.set_trace()
 
 
 def search_build(url, condition, limit, fmt):
-    if fmt:
-        globals()['fmt'] = fmt
-    build = Build(url=url)
+    build = Build(url=url, fmt=fmt)
     list_of_conditions = condition.split(",")
 
     def _operator(action):
@@ -475,9 +479,7 @@ def search_build(url, condition, limit, fmt):
 
 
 def show_param(url, params, limit, fmt):
-    if fmt:
-        globals()['fmt'] = fmt
-    build = Build(url=url)
+    build = Build(url=url, fmt=fmt)
     list_of_params = params.split(",")
 
     for i in range(limit):
@@ -500,8 +502,6 @@ def jobs_in_view(view_url: str, fmt: str) -> List[Build]:
     """
     Returns list of job (in Build type)
     """
-    if fmt:
-        globals()['fmt'] = fmt
     view_url = view_url.strip("/")
     parsed_view_url = parse("{server}/view/{name}", view_url)
     server_url = parsed_view_url["server"]
@@ -513,7 +513,7 @@ def jobs_in_view(view_url: str, fmt: str) -> List[Build]:
         try:
             # print(job['url'])
             # print(f"{Build(url=job['url'])}")
-            yield Build(url=job['url'])
+            yield Build(url=job['url'], fmt=fmt)
         except TypeError as e:
             print(f"Occurred error {e}")
             # raise f"Occurred error {e}"

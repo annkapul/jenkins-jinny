@@ -69,8 +69,9 @@ def show_possible_upstreams(url, limit, with_pdb):
 
 @cli.command()
 @click.argument('build')
-def debug_build(build):
-    main.debug_build(build)
+@click.option('-f', 'fmt', default="", help=FORMAT_HELP)
+def debug_build(build, fmt):
+    main.debug_build(build, fmt)
 
 
 @cli.command()
@@ -123,6 +124,17 @@ def jobs_in_view(view_url, fmt, with_pdb):
         for j in main.jobs_in_view(view_url, fmt):
             print("{}".format(j))
 
+
+@cli.command()
+@click.argument('url')
+@click.option('-f', 'fmt', default="", help=FORMAT_HELP)
+@click.option("--pdb", "with_pdb", is_flag=True, default=False, help=PDB_HELP)
+def show_build(url, fmt, with_pdb):
+    if fmt:
+        globals()['fmt'] = fmt
+    with pdb_context(with_pdb):
+        b = main.Build(url=url)
+        print(b)
 
 
 def start():
