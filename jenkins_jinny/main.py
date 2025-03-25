@@ -16,6 +16,7 @@ import functools
 from .exceptions import BuildNotFoundException
 import jenkins_jinny.config as config
 import urllib.parse
+import re
 
 
 pd.set_option('display.max_rows', None)
@@ -68,6 +69,7 @@ class Build:
         self._parent = None
         self._heirs = None
         self._children = list()
+        self._fmt = None
         if fmt:
             Build.fmt(fmt)
         server_params = {
@@ -108,14 +110,14 @@ class Build:
             self.url = f"{self.server.server}/job/{self.name}/{self.number}"
 
     @classmethod
-    def fmt(cls, fmt):
+    def fmt(cls, fmt=None):
         cls._fmt = fmt
 
     def __repr__(self):
         return f"{self.name}#{self.number}"
 
     def __format__(self, format_spec=None):
-        format_spec = Build._fmt
+        format_spec = Build.fmt()
         if not format_spec:
             return str(self)
         return format_spec.format(**self.__dict__,
@@ -205,7 +207,7 @@ class Build:
         self._heirs = children(self)
         return self._heirs
 
-    def get_child_job(self, name_pattern):
+    def get_child_jobs(self, name_pattern):
         return [ch
                 for ch in self.heirs
                 if name_pattern in ch.name]
@@ -274,7 +276,7 @@ class Build:
               f"completed with code {r.status_code}")
 
     @property
-    def description(self):
+    def description(self) -> str:
         return self.get_build_info()["description"]
 
     @property
@@ -282,13 +284,14 @@ class Build:
         return
 
     @property
-    def start_time(self):
+    def start_time(self) -> datetime.datetime:
         _timestamp = self.get_build_info().get('timestamp')
         if not _timestamp:
             return None
         # Divided by 1000 because Jenkins has timestamp in microseconds but
         # datetime lib receives in milliseconds
         return datetime.datetime.fromtimestamp(_timestamp / 1000)
+
 
     @property
     def duration(self):
@@ -318,12 +321,28 @@ class Build:
         for line in logs.split("\n")[direction_read]:
             yield line
 
-    def get_artifacts_content(self, filename_pattern):
-        print(self.get_build_info()["artifacts"])
-        return self.server.get_build_artifact_as_bytes(self.name, self.number, filename_pattern)
+    def get_artifacts(self, filename_pattern):
+        """
+
+        """
+        location_of_downloaded = list()
+        for artifact in self.get_build_info()["artifacts"]:
+            if not filename_pattern in artifact.get("displayPath"):
+                continue
+            url = f"{self.url}/artifact/{artifact['relativePath']}"
+            response = requests.get(url, stream=True)
+            file_location = f"/tmp/{artifact['fileName']}"
+            with open(file_location, "wb") as file:
+                for chunk in response.iter_content(chunk_size=1024):
+                    file.write(chunk)
+            location_of_downloaded.append(file_location)
+            print(f"Saved to {file_location}")
+
+        return location_of_downloaded
 
     def get_link_from_description(self):
-        return self.get_build_info()
+        return re.findall(r"http[s?]\://[a-z0-9\.\/\-_]+", 
+                          self.description)
 
     def update_build_config(self, display_name):
         self.server.submit_build(self.name, self.number,
@@ -333,6 +352,7 @@ class Build:
 
 
 def diff_job_params(urls, diff_only=False, to_html=False, fmt=None):
+
     builds = [Build(url, fmt=fmt) for url in urls]
     data = dict()
 
@@ -379,6 +399,9 @@ def parents(build):
 
 
 def children(build):
+    """
+        Returns all children (with grandchildren)
+    """
     _children = build.children
     if _children.__len__() == 0: pass
     for child in _children:

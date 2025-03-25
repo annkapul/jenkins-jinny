@@ -13,7 +13,7 @@ def get_requirements_list(requirements):
 
 setup(
     name='jenkins-jinny',
-    version='1.0.0',
+    version='1.0.1',
     packages=find_packages(include=['jenkins_jinny']),
     url='',
     license='',
