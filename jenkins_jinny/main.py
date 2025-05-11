@@ -341,7 +341,7 @@ class Build:
         return location_of_downloaded
 
     def get_link_from_description(self):
-        return re.findall(r"http[s?]\://[a-z0-9\.\/\-_]+", 
+        return re.findall(r"http[s?]\://[a-z0-9\.\/\-\?\&_]+",
                           self.description)
 
     def update_build_config(self, display_name):
