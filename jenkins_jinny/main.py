@@ -478,7 +478,7 @@ def build_flow(url, fmt):
     # plt.show()
 
 
-def show_possible_upstreams(url, limit=10):
+def show_possible_upstreams(url, fmt, limit=10):
     build = Build(url=url, fmt=fmt)
     for i in range(limit):
         print(f"{build} was triggered by {build.parent}")
