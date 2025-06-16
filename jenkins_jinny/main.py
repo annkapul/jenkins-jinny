@@ -1,4 +1,5 @@
 import enum
+import os
 
 import numpy as np
 import jenkins
@@ -46,7 +47,7 @@ class LastBuildLinks(str, enum.Enum):
 
 
 class Build:
-    _fmt: Optional[str]
+    _fmt: Optional[str] = None
     def __init__(self,
                  url=None,
                  job_name=None,
@@ -71,7 +72,8 @@ class Build:
         self._children = list()
         self._fmt = None
         if fmt:
-            Build.fmt(fmt)
+            setattr(Build, '_fmt', fmt)
+            setattr(self, '_fmt', fmt)
         server_params = {
             "username": config.JENKINS_USER,
             "password": config.JENKINS_PASSWORD
@@ -110,13 +112,16 @@ class Build:
             self.url = f"{self.server.server}/job/{self.name}/{self.number}"
 
     @classmethod
-    def fmt(cls, fmt=None):
-        cls._fmt = fmt
+    def fmt(cls):
+        # cls._fmt = fmt
+        return cls._fmt
 
     def __repr__(self):
+        # print("DEBUG: started __repr__")
         return f"{self.name}#{self.number}"
 
     def __format__(self, format_spec=None):
+        # print("DEBUG: started __format__")
         format_spec = Build.fmt()
         if not format_spec:
             return str(self)
@@ -255,11 +260,12 @@ class Build:
         """
         Requires JENKINS_USER and JENKINS_PASSWORD
         """
+        if not os.environ.get("JENKINS_USER") or not os.environ.get("JENKINS_PASSWORD"):
+            raise RuntimeError("JENKINS_USER and JENKINS_PASSWORD not set")
         data = {
             "json": {
                 "Jenkins-Crumb": self._crumb,
                 "displayName": f"#{self.number} {text}",
-                "description": f"{self.description}"
                 }
             }
         r = self.server.jenkins_request(
@@ -278,6 +284,30 @@ class Build:
     @property
     def description(self) -> str:
         return self.get_build_info()["description"]
+
+    @description.setter
+    def description(self, text):
+        """
+        Requires JENKINS_USER and JENKINS_PASSWORD
+        """
+        if not os.environ.get("JENKINS_USER") or not os.environ.get("JENKINS_PASSWORD"):
+            raise RuntimeError("JENKINS_USER and JENKINS_PASSWORD not set")
+        data = {
+                "description": f"{text}",
+                "Submit": ""
+            }
+        r = self.server.jenkins_request(
+            requests.Request(
+                'POST',
+                url=f"{self.url}/submitDescription",
+                data=urllib.parse.urlencode(data),
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Jenkins-Crumb": self._crumb}
+                )
+            )
+        print(f"Updating description to {data['description']} "
+              f"completed with code {r.status_code}")
 
     @property
     def triggered_by(self):
