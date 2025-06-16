@@ -56,7 +56,8 @@ def build_flow(url, fmt, with_pdb):
 @click.argument('url', nargs=1)
 @click.option('--limit', 'limit', default=10)
 @click.option("--pdb", "with_pdb", is_flag=True, default=False, help=PDB_HELP)
-def show_possible_upstreams(url, limit, with_pdb):
+@click.option('-f', 'fmt', default="", help=FORMAT_HELP)
+def show_possible_upstreams(url, limit, with_pdb, fmt):
     """
     Shows a parent job for first 10 jobs starting from defined job
 
@@ -64,7 +65,7 @@ def show_possible_upstreams(url, limit, with_pdb):
 
     """
     with pdb_context(with_pdb):
-        main.show_possible_upstreams(url, limit=limit)
+        main.show_possible_upstreams(url, limit=limit, fmt=fmt)
 
 
 @cli.command()
