@@ -1,11 +1,13 @@
 import enum
 import os
+import sys
 
 import numpy as np
 import jenkins
 import jmespath
 import pandas as pd
 import requests
+import logging
 from parse import parse
 import networkx as nx
 import ipdb
@@ -23,6 +25,12 @@ import re
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', None)
+
+level = logging.DEBUG if os.environ.get("DEBUG") else logging.INFO
+
+logging.basicConfig(level=level, stream=sys.stdout,
+                    format="%(asctime)s - %(name)s - %(levelname)s- %(funcName)s - %(message)s")
+LOG = logging.getLogger(__name__)
 
 
 class Params:
@@ -218,6 +226,7 @@ class Build:
                 if name_pattern in ch.name]
 
     def get_build_info(self):
+        LOG.debug(f"Started get_build_info for {self}")
         return self.server.get_build_info(self.name, self.number)
 
     def build(self):
