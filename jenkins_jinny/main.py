@@ -226,7 +226,7 @@ class Build:
                 if name_pattern in ch.name]
 
     def get_build_info(self):
-        LOG.debug(f"Started get_build_info for {self}")
+        LOG.debug("Started get_build_info for " + str(self))
         return self.server.get_build_info(self.name, self.number)
 
     def build(self):
