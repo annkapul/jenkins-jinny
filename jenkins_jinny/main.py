@@ -138,7 +138,8 @@ class Build:
                                   duration=self.duration,
                                   start_time=self.start_time,
                                   display_name=self.display_name,
-                                  param=self.param
+                                  param=self.param,
+                                  parent=self.parent
                                   )
 
     @property
@@ -225,6 +226,7 @@ class Build:
                 for ch in self.heirs
                 if name_pattern in ch.name]
 
+    @functools.lru_cache
     def get_build_info(self):
         LOG.debug("Started get_build_info for " + str(self))
         return self.server.get_build_info(self.name, self.number)
@@ -537,8 +539,8 @@ def search_build(url, condition, limit, fmt):
                 found = False
 
         if found:
-            print(
-                f"{build.__repr__():40} {build.duration} {build.status:12} {build.url}")
+            # print(
+            #     f"{build.__repr__():40} {build.duration} {build.status:12} {build.url}")
             yield build
 
         previous = jmespath.search("previousBuild.url", build.get_build_info())
