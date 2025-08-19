@@ -360,6 +360,13 @@ class Build:
         for line in logs.split("\n")[direction_read]:
             yield line
 
+    def has_log_line(self, text):
+        for line in self.get_logs():
+            if text in line:
+                LOG.debug(f"found text {text} in line {line}")
+                return True
+        return False
+
     def get_artifacts(self, filename_pattern):
         """
 
@@ -532,6 +539,7 @@ def search_build(url, condition, limit, fmt):
         if found:
             print(
                 f"{build.__repr__():40} {build.duration} {build.status:12} {build.url}")
+            yield build
 
         previous = jmespath.search("previousBuild.url", build.get_build_info())
         if previous is None:
