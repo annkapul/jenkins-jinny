@@ -139,7 +139,8 @@ class Build:
                                   start_time=self.start_time,
                                   display_name=self.display_name,
                                   param=self.param,
-                                  parent=self.parent
+                                  parent=self.parent,
+                                  triggered_by=self.triggered_by
                                   )
 
     @property
@@ -168,20 +169,15 @@ class Build:
     @property
     def parent(self):
         if self._parent: return self._parent
-        try:
-            build_info = self.server.get_build_info(self.name, self.number)
-        except jenkins.JenkinsException as e:
-            print(f"{e}")
-            return None
 
         found = jmespath.search(
             "actions[*].causes[?contains(_class,'BuildUpstreamCause')]",
-            build_info)[0]
+            self.get_build_info())[0]
         if not found:
             found = jmespath.search(
                 "actions[*].causes[?contains(_class,"
                 "'hudson.model.Cause$UpstreamCause')]",
-                build_info)[0]
+                self.get_build_info())[0]
         # print(found)
         if not found:
             # print(f"Returned parent=None for {self}")
@@ -226,7 +222,7 @@ class Build:
                 for ch in self.heirs
                 if name_pattern in ch.name]
 
-    @functools.lru_cache
+    @functools.lru_cache(maxsize=10)
     def get_build_info(self):
         LOG.debug("Started get_build_info for " + str(self))
         return self.server.get_build_info(self.name, self.number)
@@ -322,6 +318,17 @@ class Build:
 
     @property
     def triggered_by(self):
+        found = jmespath.search(
+            "actions[*].causes[?contains(_class,'hudson.model.Cause$UserIdCause')]",
+            self.get_build_info())[0]
+        if found:
+            return found[0]["userId"]
+
+        found = jmespath.search("actions[*].causes[?contains(_class,'hudson.triggers.TimerTrigger$TimerTriggerCause')]",
+            self.get_build_info())[0]
+
+        if found:
+            return "timer"
         return
 
     @property
@@ -369,7 +376,7 @@ class Build:
                 return True
         return False
 
-    def get_artifacts(self, filename_pattern):
+    def get_artifacts(self, filename_pattern=""):
         """
 
         """
