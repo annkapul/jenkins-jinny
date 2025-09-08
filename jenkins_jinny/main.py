@@ -385,19 +385,26 @@ class Build:
             if not filename_pattern in artifact.get("displayPath"):
                 continue
             url = f"{self.url}/artifact/{artifact['relativePath']}"
-            response = requests.get(url, stream=True)
             file_location = f"/tmp/{artifact['fileName']}"
-            with open(file_location, "wb") as file:
-                for chunk in response.iter_content(chunk_size=1024):
-                    file.write(chunk)
+            self.download_file(url, file_location)
             location_of_downloaded.append(file_location)
             print(f"Saved to {file_location}")
 
         return location_of_downloaded
 
-    def get_link_from_description(self):
-        return re.findall(r"http[s?]\://[a-z0-9\.\/\-\?\&_]+",
+    @staticmethod
+    def download_file(url, filename):
+        response = requests.get(url, stream=True)
+        with open(filename, "wb") as file:
+            for chunk in response.iter_content(chunk_size=1024):
+                file.write(chunk)
+        print(f"Saved to {filename}")
+        return filename
+
+    def get_link_from_description(self, pattern=""):
+        links = re.findall(r"http[s?]\://[a-z0-9\.\/\-\?\&_]+",
                           self.description)
+        return filter(lambda link: pattern in link, links)
 
     def update_build_config(self, display_name):
         self.server.submit_build(self.name, self.number,
