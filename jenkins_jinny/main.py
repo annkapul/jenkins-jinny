@@ -404,7 +404,7 @@ class Build:
     def get_link_from_description(self, pattern=""):
         links = re.findall(r"http[s?]\://[a-z0-9\.\/\-\?\&_]+",
                           self.description)
-        return filter(lambda link: pattern in link, links)
+        return list(filter(lambda link: pattern in link, links))
 
     def update_build_config(self, display_name):
         self.server.submit_build(self.name, self.number,
