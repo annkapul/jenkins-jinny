@@ -2,10 +2,8 @@ import enum
 import os
 import sys
 
-import numpy as np
 import jenkins
 import jmespath
-import pandas as pd
 import requests
 import logging
 from parse import parse
@@ -21,10 +19,6 @@ import jenkins_jinny.config as config
 import urllib.parse
 import re
 
-
-pd.set_option('display.max_rows', None)
-pd.set_option('display.max_columns', None)
-pd.set_option('display.width', None)
 
 level = logging.DEBUG if os.environ.get("DEBUG") else logging.INFO
 
@@ -414,6 +408,14 @@ class Build:
 
 
 def diff_job_params(urls, diff_only=False, to_html=False, fmt=None):
+    try:
+        import pandas as pd
+    except ImportError:
+        raise ImportError("pandas is not installed. Reinstall with "
+                          "'pip install jenkins-jinny[full]' command")
+    pd.set_option('display.max_rows', None)
+    pd.set_option('display.max_columns', None)
+    pd.set_option('display.width', None)
 
     builds = [Build(url, fmt=fmt) for url in urls]
     data = dict()
