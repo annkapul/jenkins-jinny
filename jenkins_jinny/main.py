@@ -396,7 +396,7 @@ class Build:
         return filename
 
     def get_link_from_description(self, pattern=""):
-        links = re.findall(r"http[s?]\://[a-z0-9\.\/\-\?\&_]+",
+        links = re.findall(r"http[s?]\://[a-z0-9\:\.\/\-\?\&_]+",
                           self.description)
         return list(filter(lambda link: pattern in link, links))
 
