@@ -149,7 +149,9 @@ class Build:
         parameters = jmespath.search("actions[*].parameters", build_info)
         if not parameters:
             return dict()
-        d = {param['name']: param['value'] for param in parameters[0]}
+        d = {param['name']: param.get('value')
+             for param in parameters[0]
+             if param.get("name")}
         return d
 
     @property
@@ -163,6 +165,7 @@ class Build:
     @property
     def parent(self):
         if self._parent: return self._parent
+        if not self.number: return None
 
         found = jmespath.search(
             "actions[*].causes[?contains(_class,'BuildUpstreamCause')]",
@@ -312,6 +315,8 @@ class Build:
 
     @property
     def triggered_by(self):
+        if not self.number: return "Not built yet"
+
         found = jmespath.search(
             "actions[*].causes[?contains(_class,'hudson.model.Cause$UserIdCause')]",
             self.get_build_info())[0]
