@@ -590,6 +590,19 @@ def show_param(url, params, limit, fmt):
             break
         build = Build(url=previous)
 
+def search_log(url, pattern, limit, fmt):
+    build = Build(url=url, fmt=fmt)
+    for i in range(limit):
+        if build.has_log_line(pattern):
+            print(f"{build}")
+
+        previous = jmespath.search("previousBuild.url", build.get_build_info())
+        if previous is None:
+            print(f"Can't get previous build")
+            break
+        build = Build(url=previous)
+
+
 
 def jobs_in_view(view_url: str, fmt: str) -> List[Build]:
     """

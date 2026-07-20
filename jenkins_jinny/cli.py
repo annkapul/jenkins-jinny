@@ -115,6 +115,18 @@ def show_param(url, params, limit, with_pdb, fmt):
                         limit=limit,
                         fmt=fmt)
 
+@cli.command()
+@click.argument('url')
+@click.argument('pattern')
+@click.option('--limit', 'limit', default=50, help="Limit of jobs to search "
+                                                   "in history")
+@click.option('-f', 'fmt', default="", help=FORMAT_HELP)
+
+@click.option("--pdb", "with_pdb", is_flag=True, default=False, help=PDB_HELP)
+def search_log(url, pattern, limit, fmt, with_pdb):
+    with pdb_context(with_pdb):
+        main.search_log(url, pattern,
+                        limit=limit,fmt=fmt)
 
 @cli.command()
 @click.argument('view_url')
