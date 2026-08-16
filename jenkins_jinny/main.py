@@ -287,7 +287,7 @@ class Build:
 
     @property
     def description(self) -> str:
-        return self.get_build_info()["description"]
+        return self.get_build_info()["description"] or ""
 
     @description.setter
     def description(self, text):
