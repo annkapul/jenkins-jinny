@@ -14,6 +14,10 @@ import datetime
 import operator
 from typing import List, Optional
 import functools
+
+from requests.adapters import HTTPAdapter
+from urllib3 import Retry
+
 from .exceptions import BuildNotFoundException
 import jenkins_jinny.config as config
 import urllib.parse
@@ -26,6 +30,14 @@ logging.basicConfig(level=level, stream=sys.stdout,
                     format="%(asctime)s - %(name)s - %(levelname)s- %(funcName)s - %(message)s")
 LOG = logging.getLogger(__name__)
 
+retry = Retry(
+    total=15,
+    connect=15,
+    read=15,
+    backoff_factor=2,  # 2s, 4s, 8s, ... capped at 120s
+    status_forcelist=(429, 500, 502, 503, 504),
+    allowed_methods=frozenset({"HEAD", "GET", "PUT", "POST", "PATCH", "DELETE", "OPTIONS", "TRACE"}),
+)
 
 class Params:
     def __init__(self, **entries):
@@ -56,7 +68,8 @@ class Build:
                  build_number=None,
                  server=None,
                  last_build_link=LastBuildLinks.LAST_BUILD,
-                 fmt=None):
+                 fmt=None,
+                 http_adapter: Optional[HTTPAdapter]=None):
         """
         :param url: full url address of job. It will be parsed into server,
         job_name, build_number
@@ -78,12 +91,14 @@ class Build:
             setattr(self, '_fmt', fmt)
         server_params = {
             "username": config.JENKINS_USER,
-            "password": config.JENKINS_PASSWORD
+            "password": config.JENKINS_PASSWORD,
+            "timeout": 10,
         }
         if url:
             self.url = url
             _url = url.strip("/")
             parsed = parse("{server}/job/{job_name}/{build_number}", _url)
+
             if parsed:
                 self.number = int(parsed['build_number'])
                 self.server = jenkins.Jenkins(parsed['server'], **server_params)
@@ -112,6 +127,10 @@ class Build:
                 self.number = int(build_number)
 
             self.url = f"{self.server.server}/job/{self.name}/{self.number}"
+            if not http_adapter:
+                http_adapter = HTTPAdapter(max_retries=retry)
+            self.server._session.mount("http://", http_adapter)
+            self.server._session.mount("https://", http_adapter)
 
     @classmethod
     def fmt(cls):
