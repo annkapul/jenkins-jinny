@@ -412,7 +412,10 @@ class Build:
 
     @staticmethod
     def download_file(url, filename):
-        response = requests.get(url, stream=True)
+        response = requests.get(
+            url,
+            auth=(config.JENKINS_USER, config.JENKINS_PASSWORD),
+            stream=True)
         with open(filename, "wb") as file:
             for chunk in response.iter_content(chunk_size=1024):
                 file.write(chunk)
